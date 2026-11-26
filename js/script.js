@@ -508,7 +508,9 @@ function loadTelegram() {
     const raw = localStorage.getItem(TELEGRAM_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) {}
-  return { botToken: '', chatId: '', autoNotif: false, syncCode: '' };
+  // Default sinkron: supaya HP & PC langsung terhubung tanpa isi manual.
+  // Catatan: kode ini publik di source website (untuk penggunaan pribadi).
+  return { botToken: '', chatId: '1452161961', autoNotif: false, syncCode: 'SYNC-23AD3DC1' };
 }
 
 function saveTelegram() {
@@ -779,6 +781,7 @@ function taskToRemote(t) {
 
 async function syncPush(t, action) {
   if (!syncCfg()) return;
+  t._pushing = true;
   if (action === 'add') {
     const res = await syncApi('add', { task: taskToRemote(t) });
     if (res && res.id) { t.syncId = res.id; save(); }
@@ -787,6 +790,7 @@ async function syncPush(t, action) {
   } else if (action === 'delete' && t.syncId) {
     await syncApi('delete', { id: t.syncId });
   }
+  t._pushing = false;
 }
 
 let syncBusy = false;
@@ -833,14 +837,17 @@ async function syncPull() {
     }
   }
 
-  // Tugas yang ada di bot tapi sudah dihapus di perangkat lain -> buang dari lokal
+  // Kalau remote KOSONG, jangan hapus tugas lokal (mencegah data hilang)
   const remoteIds = new Set(remote.map(r => r.id));
-  const before = state.tugas.length;
-  state.tugas = state.tugas.filter(t => !t.syncId || remoteIds.has(t.syncId));
-  const removed = before - state.tugas.length;
+  let removed = 0;
+  if (remote.length > 0) {
+    const before = state.tugas.length;
+    state.tugas = state.tugas.filter(t => !t.syncId || remoteIds.has(t.syncId) || t._pushing);
+    removed = before - state.tugas.length;
+  }
 
   // Tugas lokal yang belum punya syncId -> kirim ke bot
-  const unsynced = state.tugas.filter(t => !t.syncId);
+  const unsynced = state.tugas.filter(t => !t.syncId && !t._pushing);
   for (const t of unsynced) {
     const res2 = await syncApi('add', { task: taskToRemote(t) });
     if (res2 && res2.id) { t.syncId = res2.id; save(); }
