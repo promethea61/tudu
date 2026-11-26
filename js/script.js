@@ -35,7 +35,7 @@ function renderBeranda() {
 
   // Mulai hari ini: tugas yang deadline-nya hari ini
   const today = todayStr();
-  const todayTasks = state.tugas.filter(t => t.deadline === today && !t.selesai);
+  const todayTasks = state.tugas.filter(t => t.deadline && t.deadline.slice(0, 10) === today && !t.selesai);
 
   // Tugas terdekat: deadline terkecil (masih dalam 7 hari, ga selesai)
   const active = state.tugas.filter(t => !t.selesai);
@@ -191,7 +191,8 @@ function renderKalender() {
   const tugasByDate = {};
   state.tugas.forEach(t => {
     if (!t.deadline) return;
-    (tugasByDate[t.deadline] = tugasByDate[t.deadline] || []).push(t);
+    const dKey = t.deadline.slice(0, 10);
+    (tugasByDate[dKey] = tugasByDate[dKey] || []).push(t);
   });
 
   const matkulByHari = {};
@@ -235,7 +236,7 @@ function showDayDetail(iso) {
   if (!box) return;
   const d = new Date(iso + 'T00:00:00');
   const kelas = state.matkul.filter(m => m.hari === HARI_NAME[d.getDay()]);
-  const tugas = state.tugas.filter(t => t.deadline === iso);
+  const tugas = state.tugas.filter(t => t.deadline && t.deadline.slice(0, 10) === iso);
 
   box.innerHTML = `
     <div class="card__head"><h2 class="card__title">${fmtDate(iso)}</h2></div>
@@ -447,7 +448,14 @@ $('#form-tugas').addEventListener('submit', (e) => {
   renderBeranda();
   if (state.currentView === 'pertemuan') renderPertemuan();
   if (state.currentView === 'kalender') renderKalender();
-  if (affected) syncPush(affected, isEdit ? 'update' : 'add');
+  if (affected) {
+    syncPush(affected, isEdit ? 'update' : 'add');
+    const emoji = isEdit ? '✏️' : '➕';
+    const aksi = isEdit ? 'Tugas diubah' : 'Tugas baru';
+    syncNotify(`${emoji} *${aksi}* — *${judul}*
+📅 Deadline: ${fmtDate(deadline)}
+🏷 ${kategori}`);
+  }
 });
 
 // Dropdown berantai: kategori -> matkul -> pertemuan
@@ -689,7 +697,10 @@ document.addEventListener('click', (e) => {
     const id = hapusBtn.dataset.id;
     const removed = state.tugas.find(t => t.id === id);
     state.tugas = state.tugas.filter(t => t.id !== id);
-    if (removed) syncPush(removed, 'delete');
+    if (removed) {
+      syncPush(removed, 'delete');
+      syncNotify(`🗑 *Tugas dihapus* — *${removed.judul}*`);
+    }
     save();
     renderTugas();
     renderBeranda();
@@ -714,6 +725,7 @@ document.addEventListener('click', (e) => {
   if (!tugas) return;
   tugas.selesai = !tugas.selesai;
   syncPush(tugas, 'update');
+  syncNotify(`${tugas.selesai ? '✅' : '↩️'} *${tugas.selesai ? 'SELESAI' : 'BELUM selesai'}* — *${tugas.judul}*`);
   save();
   renderTugas();
   renderBeranda();
@@ -767,16 +779,29 @@ async function syncApi(action, payload = {}) {
   }
 }
 
+function normDeadline(v) {
+  if (!v) return '';
+  if (v.length === 10) return v;
+  // "2026-12-01T09:40:00+00:00" -> "2026-12-01T09:40"
+  const m = String(v).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  return m ? `${m[1]}T${m[2]}` : String(v).slice(0, 16);
+}
+
 function taskToRemote(t) {
   const per = state.pertemuan.find(p => p.id === t.pertemuanId);
   return {
     judul: t.judul,
-    deadline: t.deadline || null,
+    deadline: t.deadline ? new Date(t.deadline).toISOString() : null,
     kategori: t.kategori || 'kuliah',
     matkul_id: per ? per.matkulId : null,
     pertemuan_ke: per ? per.minggu : null,
     selesai: !!t.selesai,
   };
+}
+
+async function syncNotify(message) {
+  if (!syncCfg()) return;
+  await syncApi('notify', { message });
 }
 
 async function syncPush(t, action) {
@@ -809,14 +834,14 @@ async function syncPull() {
   for (const r of remote) {
     let local = state.tugas.find(t => t.syncId === r.id);
     if (!local) {
-      local = state.tugas.find(t => t.judul === r.judul && t.deadline === (r.deadline || ''));
+      local = state.tugas.find(t => t.judul === r.judul && t.deadline === normDeadline(r.deadline));
     }
     if (local) {
       local.syncId = r.id;
       const changed = local.judul !== r.judul || (local.deadline || '') !== (r.deadline || '') ||
         !!local.selesai !== !!r.selesai || (local.kategori || '') !== (r.kategori || '');
       local.judul = r.judul;
-      local.deadline = r.deadline || '';
+      local.deadline = normDeadline(r.deadline);
       local.selesai = !!r.selesai;
       local.kategori = r.kategori || 'kuliah';
       if (r.pertemuan_ke != null) {
@@ -830,7 +855,7 @@ async function syncPull() {
         p.minggu === r.pertemuan_ke && (!r.matkul_id || p.matkulId === r.matkul_id)) || null;
       state.tugas.push({
         id: uid(), syncId: r.id, pertemuanId: per ? per.id : null,
-        judul: r.judul, deadline: r.deadline || '', keterangan: '',
+        judul: r.judul, deadline: normDeadline(r.deadline), keterangan: '',
         selesai: !!r.selesai, kategori: r.kategori || 'kuliah'
       });
       added++;

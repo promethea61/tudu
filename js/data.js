@@ -81,12 +81,12 @@ function createDefaultData() {
   const tugas = [
     {
       id: uid(), pertemuanId: per('Matematika 1', 2).id,
-      judul: 'Latihan soal limit', deadline: per('Matematika 1', 2).tanggal,
+      judul: 'Latihan soal limit', deadline: per('Matematika 1', 2).tanggal + 'T09:40',
       keterangan: 'Bab 2 no. 1-15', selesai: false, kategori: 'kuliah'
     },
     {
       id: uid(), pertemuanId: per('Logika Digital 1', 2).id,
-      judul: 'Laporan praktikum gerbang logika', deadline: per('Logika Digital 1', 2).tanggal,
+      judul: 'Laporan praktikum gerbang logika', deadline: per('Logika Digital 1', 2).tanggal + 'T13:00',
       keterangan: 'Format PDF, kumpul di Classroom', selesai: false, kategori: 'kuliah'
     },
     {
@@ -207,15 +207,18 @@ function save() {
 // ---------- Helpers format ----------
 const fmtDate = (iso) => {
   if (!iso) return '—';
-  const d = new Date(iso + 'T00:00:00');
+  const d = iso.includes('T') ? new Date(iso) : new Date(iso + 'T00:00:00');
   if (isNaN(d)) return iso;
-  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  const tanggal = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  const adaJam = iso.includes('T') && iso.length > 10 && !iso.endsWith('T00:00');
+  const jam = adaJam ? iso.slice(11, 16) : '';
+  return jam ? `${tanggal} · ${jam}` : tanggal;
 };
 
 const daysUntil = (iso) => {
   if (!iso) return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const target = new Date(iso + 'T00:00:00');
+  const target = iso.includes('T') ? new Date(iso) : new Date(iso + 'T00:00:00');
   return Math.ceil((target - today) / 86400000);
 };
 
