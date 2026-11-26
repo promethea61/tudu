@@ -493,7 +493,13 @@ document.addEventListener('keydown', (e) => {
 
 // Init: render halaman beranda saat pertama kali dibuka
 renderBeranda();
-if (syncCfg()) setTimeout(syncPull, 300);
+if (syncCfg()) {
+  setTimeout(syncPull, 300);
+  setInterval(() => { if (!document.hidden) syncPull(); }, 20000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncPull();
+  });
+}
 
 // ---------- Telegram (notifikasi) ----------
 const TELEGRAM_KEY = 'kelas_telegram';
@@ -556,7 +562,7 @@ $('#btn-sync-now').addEventListener('click', async () => {
   const r = await syncPull();
   btn.textContent = old;
   btn.disabled = false;
-  if (r && !r.error) showToast(`Sinkron: ${r.pulled} diperbarui, ${r.pushed} dikirim`);
+  if (r && !r.error) showToast(`Sinkron: ${r.pulled} diperbarui, ${r.pushed} dikirim, ${r.removed} dihapus`);
   else showToast('Gagal sinkron. Cek Chat ID & kode.');
 });
 $('#btn-cancel-telegram').addEventListener('click', closeTelegramModal);
@@ -765,6 +771,7 @@ function taskToRemote(t) {
     judul: t.judul,
     deadline: t.deadline || null,
     kategori: t.kategori || 'kuliah',
+    matkul_id: per ? per.matkulId : null,
     pertemuan_ke: per ? per.minggu : null,
     selesai: !!t.selesai,
   };
@@ -782,9 +789,15 @@ async function syncPush(t, action) {
   }
 }
 
+let syncBusy = false;
 async function syncPull() {
+  if (syncBusy) return { pulled: 0, added: 0, updated: 0, pushed: 0 };
+  syncBusy = true;
   const res = await syncApi('list');
-  if (!res || !Array.isArray(res.tasks)) return { pulled: 0, error: true };
+  if (!res || !Array.isArray(res.tasks)) {
+    syncBusy = false;
+    return { pulled: 0, error: true };
+  }
 
   const remote = res.tasks;
   let added = 0, updated = 0;
@@ -803,12 +816,14 @@ async function syncPull() {
       local.selesai = !!r.selesai;
       local.kategori = r.kategori || 'kuliah';
       if (r.pertemuan_ke != null) {
-        const per = state.pertemuan.find(p => p.minggu === r.pertemuan_ke);
+        const per = state.pertemuan.find(p =>
+          p.minggu === r.pertemuan_ke && (!r.matkul_id || p.matkulId === r.matkul_id));
         if (per) local.pertemuanId = per.id;
       }
       if (changed) updated++;
     } else {
-      const per = state.pertemuan.find(p => p.minggu === r.pertemuan_ke) || null;
+      const per = state.pertemuan.find(p =>
+        p.minggu === r.pertemuan_ke && (!r.matkul_id || p.matkulId === r.matkul_id)) || null;
       state.tugas.push({
         id: uid(), syncId: r.id, pertemuanId: per ? per.id : null,
         judul: r.judul, deadline: r.deadline || '', keterangan: '',
@@ -818,6 +833,12 @@ async function syncPull() {
     }
   }
 
+  // Tugas yang ada di bot tapi sudah dihapus di perangkat lain -> buang dari lokal
+  const remoteIds = new Set(remote.map(r => r.id));
+  const before = state.tugas.length;
+  state.tugas = state.tugas.filter(t => !t.syncId || remoteIds.has(t.syncId));
+  const removed = before - state.tugas.length;
+
   // Tugas lokal yang belum punya syncId -> kirim ke bot
   const unsynced = state.tugas.filter(t => !t.syncId);
   for (const t of unsynced) {
@@ -826,11 +847,14 @@ async function syncPull() {
   }
 
   save();
-  renderTugas();
-  renderBeranda();
-  if (state.currentView === 'pertemuan') renderPertemuan();
-  if (state.currentView === 'kalender') renderKalender();
-  return { pulled: added + updated, added, updated, pushed: unsynced.length };
+  if (added || updated) {
+    renderTugas();
+    renderBeranda();
+    if (state.currentView === 'pertemuan') renderPertemuan();
+    if (state.currentView === 'kalender') renderKalender();
+  }
+  syncBusy = false;
+  return { pulled: added + updated, added, updated, pushed: unsynced.length, removed };
 }
 
 // ---------- Toast ----------

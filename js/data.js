@@ -29,6 +29,15 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+// ID stabil lintas device (dari nama) supaya sinkronisasi cocok
+function stableId(prefix, text) {
+  let h = 0;
+  for (let i = 0; i < text.length; i++) {
+    h = ((h << 5) - h + text.charCodeAt(i)) | 0;
+  }
+  return prefix + '-' + Math.abs(h).toString(36);
+}
+
 function isoDate(d) {
   const p = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
@@ -45,7 +54,7 @@ function mondayOf(d) {
 
 function createDefaultData() {
   const start = mondayOf(new Date());
-  const matkul = MATKUL.map(m => ({ id: uid(), ...m }));
+  const matkul = MATKUL.map(m => ({ id: stableId('mk', m.nama), ...m }));
 
   // 16 pertemuan per matkul, tanggal mengikuti hari kuliahnya
   const pertemuan = [];
@@ -54,7 +63,7 @@ function createDefaultData() {
       const t = new Date(start);
       t.setDate(t.getDate() + (w - 1) * 7 + (HARI_IDX[m.hari] - 1));
       pertemuan.push({
-        id: uid(),
+        id: `${m.id}-p${w}`,
         matkulId: m.id,
         minggu: w,
         tanggal: isoDate(t),
@@ -138,7 +147,45 @@ function load() {
   }
 
   Object.assign(state, data);
+  normalizeStableIds();
   return state;
+}
+
+// Data lama pakai ID acak -> petakan ke ID stabil tanpa buang tugas
+function normalizeStableIds() {
+  if (!state.matkul.length) return;
+  if (state.matkul[0].id.startsWith('mk-')) return;
+
+  const oldByNama = {};
+  state.matkul.forEach(m => { oldByNama[m.nama] = m.id; });
+  const freshMatkul = MATKUL.map(m => ({ id: stableId('mk', m.nama), ...m }));
+
+  const start = state.semesterStart ? new Date(state.semesterStart + 'T00:00:00') : mondayOf(new Date());
+  const pertemuanMap = new Map();
+  const freshPertemuan = [];
+  for (const m of freshMatkul) {
+    const oldMkId = oldByNama[m.nama];
+    for (let w = 1; w <= TOTAL_MINGGU; w++) {
+      const nid = `${m.id}-p${w}`;
+      const old = state.pertemuan.find(p => p.matkulId === oldMkId && p.minggu === w);
+      if (old) pertemuanMap.set(old.id, nid);
+      const t = new Date(start);
+      t.setDate(t.getDate() + (w - 1) * 7 + (HARI_IDX[m.hari] - 1));
+      freshPertemuan.push({
+        id: nid, matkulId: m.id, minggu: w,
+        tanggal: isoDate(t), nama: `${m.nama} — Pertemuan ${w}`, topik: '',
+      });
+    }
+  }
+
+  state.matkul = freshMatkul;
+  state.pertemuan = freshPertemuan;
+  state.tugas.forEach(t => {
+    if (t.pertemuanId && pertemuanMap.has(t.pertemuanId)) {
+      t.pertemuanId = pertemuanMap.get(t.pertemuanId);
+    }
+  });
+  save();
 }
 
 function save() {
