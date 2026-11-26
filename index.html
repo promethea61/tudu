@@ -232,7 +232,7 @@
   <div class="modal-backdrop" id="modal-telegram">
     <div class="modal">
       <h2 class="modal__title">Telegram</h2>
-      <p class="muted" style="margin-bottom:16px;">Kirim notifikasi tugas ke Telegram. <a href="#" id="tg-open-botfather">Bikin bot via @BotFather</a></p>
+      <p class="muted" style="margin-bottom:16px;">Sinkron tugas website &amp; bot Telegram. Ambil kode dengan kirim <code>/kode</code> ke bot.</p>
       <form id="form-telegram" class="form">
         <label class="field">
           <span class="field__label">Bot Token</span>
@@ -244,11 +244,17 @@
           <span class="hint" style="display:block;margin-top:4px;">Cari chat ID: kirim pesan ke bot, lalu panggil <code>/me</code>. Atau gunakan bot @getmyid.</span>
         </label>
         <label class="field">
+          <span class="field__label">Kode sinkron</span>
+          <input class="input" type="text" name="sync_code" id="tg-sync-code" placeholder="SYNC-XXXXXXXX">
+          <span class="hint" style="display:block;margin-top:4px;">Kirim <code>/kode</code> ke bot Telegram untuk dapat kode ini.</span>
+        </label>
+        <label class="field">
           <span class="field__label">Notifikasi otomatis</span>
           <input class="input" type="checkbox" name="auto_notif" id="tg-auto-notif">
         </label>
         <p class="form__error" id="form-telegram-error"></p>
         <div class="form__actions" style="display:flex;flex-direction:column;gap:8px;">
+          <button type="button" class="btn btn--secondary" id="btn-sync-now">Sinkron Sekarang</button>
           <button type="button" class="btn btn--secondary" id="btn-test-telegram">Kirim Test</button>
           <button type="button" class="btn" id="btn-cancel-telegram">Batal</button>
           <button type="submit" class="btn btn--primary">Simpan</button>

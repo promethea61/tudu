@@ -422,6 +422,7 @@ $('#form-tugas').addEventListener('submit', (e) => {
   if (!deadline) { $('#form-error').textContent = 'Tanggal deadline wajib diisi.'; return; }
 
   const isEdit = !!state.editingTugasId;
+  let affected = null;
   if (isEdit) {
     const t = state.tugas.find(x => x.id === state.editingTugasId);
     if (t) {
@@ -430,12 +431,14 @@ $('#form-tugas').addEventListener('submit', (e) => {
       t.deadline = deadline;
       t.keterangan = keterangan;
       t.kategori = kategori;
+      affected = t;
     }
   } else {
-    state.tugas.push({
+    affected = {
       id: uid(), pertemuanId: pertemuanId || null,
       judul, deadline, keterangan, selesai: false, kategori
-    });
+    };
+    state.tugas.push(affected);
   }
 
   save();
@@ -490,6 +493,7 @@ document.addEventListener('keydown', (e) => {
 
 // Init: render halaman beranda saat pertama kali dibuka
 renderBeranda();
+if (syncCfg()) setTimeout(syncPull, 300);
 
 // ---------- Telegram (notifikasi) ----------
 const TELEGRAM_KEY = 'kelas_telegram';
@@ -499,7 +503,7 @@ function loadTelegram() {
     const raw = localStorage.getItem(TELEGRAM_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) {}
-  return { botToken: '', chatId: '', autoNotif: false };
+  return { botToken: '', chatId: '', autoNotif: false, syncCode: '' };
 }
 
 function saveTelegram() {
@@ -507,6 +511,7 @@ function saveTelegram() {
     botToken: $('#tg-bot-token').value.trim(),
     chatId: $('#tg-chat-id').value.trim(),
     autoNotif: $('#tg-auto-notif').checked,
+    syncCode: $('#tg-sync-code') ? $('#tg-sync-code').value.trim() : '',
   };
   localStorage.setItem(TELEGRAM_KEY, JSON.stringify(data));
   return data;
@@ -517,6 +522,7 @@ function openTelegramModal() {
   $('#tg-bot-token').value = cfg.botToken;
   $('#tg-chat-id').value = cfg.chatId;
   $('#tg-auto-notif').checked = cfg.autoNotif;
+  if ($('#tg-sync-code')) $('#tg-sync-code').value = cfg.syncCode || '';
   $('#modal-telegram').classList.add('modal-backdrop--open');
 }
 
@@ -542,6 +548,17 @@ function sendTelegramMessage(text) {
 }
 
 $('#btn-telegram').addEventListener('click', openTelegramModal);
+$('#btn-sync-now').addEventListener('click', async () => {
+  const btn = $('#btn-sync-now');
+  const old = btn.textContent;
+  btn.textContent = 'Sinkron…';
+  btn.disabled = true;
+  const r = await syncPull();
+  btn.textContent = old;
+  btn.disabled = false;
+  if (r && !r.error) showToast(`Sinkron: ${r.pulled} diperbarui, ${r.pushed} dikirim`);
+  else showToast('Gagal sinkron. Cek Chat ID & kode.');
+});
 $('#btn-cancel-telegram').addEventListener('click', closeTelegramModal);
 
 $('#modal-telegram').addEventListener('click', (e) => {
@@ -554,7 +571,6 @@ $('#form-telegram').addEventListener('submit', (e) => {
   errorEl.textContent = '';
   const botToken = $('#tg-bot-token').value.trim();
   const chatId = $('#tg-chat-id').value.trim();
-  if (!botToken) { errorEl.textContent = 'Bot Token wajib diisi.'; return; }
   if (!chatId) { errorEl.textContent = 'Chat ID wajib diisi.'; return; }
   saveTelegram();
   closeTelegramModal();
@@ -663,7 +679,9 @@ document.addEventListener('click', (e) => {
   const hapusBtn = e.target.closest('[data-action="hapus"]');
   if (hapusBtn) {
     const id = hapusBtn.dataset.id;
+    const removed = state.tugas.find(t => t.id === id);
     state.tugas = state.tugas.filter(t => t.id !== id);
+    if (removed) syncPush(removed, 'delete');
     save();
     renderTugas();
     renderBeranda();
@@ -687,6 +705,7 @@ document.addEventListener('click', (e) => {
   const tugas = state.tugas.find(t => t.id === id);
   if (!tugas) return;
   tugas.selesai = !tugas.selesai;
+  syncPush(tugas, 'update');
   save();
   renderTugas();
   renderBeranda();
@@ -704,6 +723,115 @@ document.addEventListener('click', (e) => {
     }
   }
 });
+
+
+// ---------- Sinkronisasi Telegram (Supabase) ----------
+const SYNC_URL = 'https://tpsefuzwbtgkorrrndxl.supabase.co/functions/v1/tugas-sync';
+const SYNC_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwc2VmdXp3YnRna29ycnJuZHhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU0NDU1NjYsImV4cCI6MjExMTAyMTU2Nn0.RWLn5MHBAMlOstzRa-cgs6xosWcqDabTcS2cXnA0K5I';
+
+function syncCfg() {
+  const c = loadTelegram();
+  return (c.chatId && c.syncCode) ? c : null;
+}
+
+async function syncApi(action, payload = {}) {
+  const c = syncCfg();
+  if (!c) return null;
+  try {
+    const url = action === 'list'
+      ? `${SYNC_URL}?action=list&chat_id=${encodeURIComponent(c.chatId)}`
+      : SYNC_URL;
+    const res = await fetch(url, {
+      method: action === 'list' ? 'GET' : 'POST',
+      headers: {
+        'Authorization': `Bearer ${SYNC_ANON}`,
+        'x-sync-code': c.syncCode,
+        'Content-Type': 'application/json',
+      },
+      body: action === 'list' ? undefined : JSON.stringify({ action, chat_id: c.chatId, ...payload }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Gagal sinkron');
+    return data;
+  } catch (e) {
+    console.warn('[sync]', e.message);
+    return null;
+  }
+}
+
+function taskToRemote(t) {
+  const per = state.pertemuan.find(p => p.id === t.pertemuanId);
+  return {
+    judul: t.judul,
+    deadline: t.deadline || null,
+    kategori: t.kategori || 'kuliah',
+    pertemuan_ke: per ? per.minggu : null,
+    selesai: !!t.selesai,
+  };
+}
+
+async function syncPush(t, action) {
+  if (!syncCfg()) return;
+  if (action === 'add') {
+    const res = await syncApi('add', { task: taskToRemote(t) });
+    if (res && res.id) { t.syncId = res.id; save(); }
+  } else if (action === 'update' && t.syncId) {
+    await syncApi('update', { id: t.syncId, task: taskToRemote(t) });
+  } else if (action === 'delete' && t.syncId) {
+    await syncApi('delete', { id: t.syncId });
+  }
+}
+
+async function syncPull() {
+  const res = await syncApi('list');
+  if (!res || !Array.isArray(res.tasks)) return { pulled: 0, error: true };
+
+  const remote = res.tasks;
+  let added = 0, updated = 0;
+
+  for (const r of remote) {
+    let local = state.tugas.find(t => t.syncId === r.id);
+    if (!local) {
+      local = state.tugas.find(t => t.judul === r.judul && t.deadline === (r.deadline || ''));
+    }
+    if (local) {
+      local.syncId = r.id;
+      const changed = local.judul !== r.judul || (local.deadline || '') !== (r.deadline || '') ||
+        !!local.selesai !== !!r.selesai || (local.kategori || '') !== (r.kategori || '');
+      local.judul = r.judul;
+      local.deadline = r.deadline || '';
+      local.selesai = !!r.selesai;
+      local.kategori = r.kategori || 'kuliah';
+      if (r.pertemuan_ke != null) {
+        const per = state.pertemuan.find(p => p.minggu === r.pertemuan_ke);
+        if (per) local.pertemuanId = per.id;
+      }
+      if (changed) updated++;
+    } else {
+      const per = state.pertemuan.find(p => p.minggu === r.pertemuan_ke) || null;
+      state.tugas.push({
+        id: uid(), syncId: r.id, pertemuanId: per ? per.id : null,
+        judul: r.judul, deadline: r.deadline || '', keterangan: '',
+        selesai: !!r.selesai, kategori: r.kategori || 'kuliah'
+      });
+      added++;
+    }
+  }
+
+  // Tugas lokal yang belum punya syncId -> kirim ke bot
+  const unsynced = state.tugas.filter(t => !t.syncId);
+  for (const t of unsynced) {
+    const res2 = await syncApi('add', { task: taskToRemote(t) });
+    if (res2 && res2.id) { t.syncId = res2.id; save(); }
+  }
+
+  save();
+  renderTugas();
+  renderBeranda();
+  if (state.currentView === 'pertemuan') renderPertemuan();
+  if (state.currentView === 'kalender') renderKalender();
+  return { pulled: added + updated, added, updated, pushed: unsynced.length };
+}
 
 // ---------- Toast ----------
 function showToast(msg) {
