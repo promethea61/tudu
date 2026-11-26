@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kelas — Pengelola Tugas</title>
+  <meta name="description" content="Website kelas sederhana untuk melacak tugas, deadline, dan pertemuan.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,14..64,400;0,14..64,500;0,14..64,600;0,14..64,700;1,14..64,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a href="#" class="brand" aria-label="Kelas beranda">
+        <svg class="brand__mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 11l3 3L22 4"/>
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        </svg>
+        <span class="brand__text">Kelas<span class="brand__dot">.</span></span>
+      </a>
+      <nav class="nav" id="nav">
+        <a href="#" data-view="beranda" class="nav__link active">
+          <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9" rx="1"/>
+            <rect x="14" y="3" width="7" height="5" rx="1"/>
+            <rect x="14" y="12" width="7" height="9" rx="1"/>
+            <rect x="3" y="16" width="7" height="5" rx="1"/>
+          </svg>
+          Beranda
+        </a>
+        <a href="#" data-view="pertemuan" class="nav__link">
+          <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          Pertemuan
+        </a>
+        <a href="#" data-view="kalender" class="nav__link">
+          <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+            <circle cx="8" cy="14" r="1"/>
+            <circle cx="12" cy="14" r="1"/>
+            <circle cx="16" cy="14" r="1"/>
+          </svg>
+          Kalender
+        </a>
+        <a href="#" data-view="tugas" class="nav__link">
+          <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"/>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          </svg>
+          Tugas
+        </a>
+        <button class="btn btn--small" id="btn-telegram" title="Konfigurasi Telegram">
+          <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 2L11 13"/>
+            <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
+          </svg>
+          <span class="nav__label">Telegram</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ===================== BERANDA ===================== -->
+    <section id="view-beranda" class="view active">
+      <div class="page-head">
+        <h1>Halo, Semua.</h1>
+        <p class="muted">Ini halaman ringkasan tugas kelas kamu.</p>
+      </div>
+
+      <div class="stats" id="stats">
+        <div class="stat">
+          <span class="stat__val" id="stat-total">0</span>
+          <span class="stat__label">Total tugas</span>
+        </div>
+        <div class="stat stat--done">
+          <span class="stat__val" id="stat-done">0</span>
+          <span class="stat__label">Selesai</span>
+        </div>
+        <div class="stat stat--pend">
+          <span class="stat__val" id="stat-pend">0</span>
+          <span class="stat__label">Belum selesai</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card__head">
+          <h2 class="card__title">Jadwal kuliah</h2>
+          <span class="hint">Semester ini</span>
+        </div>
+        <div id="jadwal-list"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card__head">
+            <h2 class="card__title">Mulai hari ini</h2>
+            <span class="badge" id="due-count-badge">0</span>
+          </div>
+          <ul class="list" id="today-list"></ul>
+        </div>
+        <div class="card">
+          <div class="card__head">
+            <h2 class="card__title">Tugas terdekat</h2>
+            <span class="hint">Tugas dengan deadline terdekat</span>
+          </div>
+          <ul class="list" id="soon-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== PERTEMUAN ===================== -->
+    <section id="view-pertemuan" class="view">
+      <div class="page-head">
+        <div>
+          <h1>Pertemuan</h1>
+          <p class="muted">Pilih mata kuliah untuk lihat pertemuan 1&ndash;16.</p>
+        </div>
+      </div>
+
+      <div class="card" id="pertemuan-list"></div>
+    </section>
+
+    <!-- ===================== TUGAS ===================== -->
+    <section id="view-tugas" class="view">
+      <div class="page-head">
+        <div>
+          <h1>Tugas</h1>
+          <p class="muted">Daftar tugas, dikelompokkan per pertemuan.</p>
+        </div>
+        <div class="head-tools">
+          <input class="search" type="text" placeholder="Cari tugas..." id="search-input">
+          <div class="filter-group">
+            <select id="filter-select" aria-label="Filter tugas">
+              <option value="all">Semua</option>
+              <option value="pending">Belum selesai</option>
+              <option value="done">Selesai</option>
+            </select>
+          </div>
+          <button class="btn btn--primary" id="btn-add-tugas">+ Tambah tugas</button>
+        </div>
+      </div>
+
+      <div class="card" id="tugas-list"></div>
+    </section>
+
+    <!-- ===================== KALENDER ===================== -->
+    <section id="view-kalender" class="view">
+      <div class="page-head">
+        <div>
+          <h1>Kalender</h1>
+          <p class="muted">Titik = hari ada kuliah. Angka = deadline belum selesai.</p>
+        </div>
+        <div class="cal__nav">
+          <button class="btn btn--small" id="cal-prev" aria-label="Bulan sebelumnya">&larr;</button>
+          <span class="cal__label" id="cal-label">&nbsp;</span>
+          <button class="btn btn--small" id="cal-next" aria-label="Bulan berikutnya">&rarr;</button>
+          <button class="btn btn--small" id="cal-today">Hari ini</button>
+        </div>
+      </div>
+
+      <div class="card" id="kalender-grid"></div>
+      <div class="card cal__detail" id="cal-detail">
+        <p class="muted small">Klik tanggal untuk lihat jadwal &amp; deadline.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner">
+      <span>Kelas &mdash; pengelola tugas sederhana</span>
+      <span class="footer__note">Data tersimpan di browser (localStorage).</span>
+    </div>
+  </footer>
+
+  <!-- Modal Tambah/Edit Tugas -->
+  <div class="modal-backdrop" id="modal-tugas">
+    <div class="modal">
+      <h2 class="modal__title" id="modal-title">Tambah Tugas</h2>
+      <form id="form-tugas" class="form">
+        <label class="field">
+          <span class="field__label">Judul tugas</span>
+          <input class="input" type="text" name="judul" id="f-judul" placeholder="Misal: Tugas PPKN Bab 3" required>
+        </label>
+        <div class="field-field">
+          <span class="field__label">Kategori</span>
+          <select class="input" name="kategori" id="f-kategori">
+            <option value="kuliah">Kuliah</option>
+            <option value="personal">Pribadi</option>
+            <option value="lain">Lainnya</option>
+          </select>
+        </div>
+        <div id="field-kuliah">
+          <div class="field-field">
+            <span class="field__label">Mata kuliah</span>
+            <select class="input" name="matkul" id="f-matkul"></select>
+          </div>
+          <div class="field-field">
+            <span class="field__label">Pertemuan</span>
+            <select class="input" name="pertemuan" id="f-pertemuan"></select>
+          </div>
+        </div>
+        <div class="field-field">
+          <span class="field__label">Deadline</span>
+          <input class="input" type="date" name="deadline" id="f-deadline" required>
+        </div>
+        <label class="field">
+          <span class="field__label">Keterangan (opsional)</span>
+          <textarea class="input" name="keterangan" id="f-keterangan" rows="3" placeholder="Bobot, instruksi, atau catatan"></textarea>
+        </label>
+        <p class="form__error" id="form-error"></p>
+        <div class="form__actions">
+          <button type="button" class="btn" id="btn-cancel-tugas">Batal</button>
+          <button type="submit" class="btn btn--primary" id="btn-save-tugas">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Telegram -->
+  <div class="modal-backdrop" id="modal-telegram">
+    <div class="modal">
+      <h2 class="modal__title">Telegram</h2>
+      <p class="muted" style="margin-bottom:16px;">Kirim notifikasi tugas ke Telegram. <a href="#" id="tg-open-botfather">Bikin bot via @BotFather</a></p>
+      <form id="form-telegram" class="form">
+        <label class="field">
+          <span class="field__label">Bot Token</span>
+          <input class="input" type="text" name="bot_token" id="tg-bot-token" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+        </label>
+        <label class="field">
+          <span class="field__label">Chat ID</span>
+          <input class="input" type="text" name="chat_id" id="tg-chat-id" placeholder="123456789">
+          <span class="hint" style="display:block;margin-top:4px;">Cari chat ID: kirim pesan ke bot, lalu panggil <code>/me</code>. Atau gunakan bot @getmyid.</span>
+        </label>
+        <label class="field">
+          <span class="field__label">Notifikasi otomatis</span>
+          <input class="input" type="checkbox" name="auto_notif" id="tg-auto-notif">
+        </label>
+        <p class="form__error" id="form-telegram-error"></p>
+        <div class="form__actions" style="display:flex;flex-direction:column;gap:8px;">
+          <button type="button" class="btn btn--secondary" id="btn-test-telegram">Kirim Test</button>
+          <button type="button" class="btn" id="btn-cancel-telegram">Batal</button>
+          <button type="submit" class="btn btn--primary">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <noscript>
+    <p class="noscript">Siapkan JavaScript agar halaman ini berfungsi.</p>
+  </noscript>
+
+  <script src="js/data.js"></script>
+  <script src="js/script.js"></script>
+</body>
+</html>
