@@ -493,13 +493,11 @@ document.addEventListener('keydown', (e) => {
 
 // Init: render halaman beranda saat pertama kali dibuka
 renderBeranda();
-if (syncCfg()) {
-  setTimeout(syncPull, 300);
-  setInterval(() => { if (!document.hidden) syncPull(); }, 20000);
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) syncPull();
-  });
-}
+setTimeout(() => { if (syncCfg()) syncPull(); }, 300);
+setInterval(() => { if (!document.hidden && syncCfg()) syncPull(); }, 20000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && syncCfg()) syncPull();
+});
 
 // ---------- Telegram (notifikasi) ----------
 const TELEGRAM_KEY = 'kelas_telegram';
@@ -578,8 +576,9 @@ $('#form-telegram').addEventListener('submit', (e) => {
   const botToken = $('#tg-bot-token').value.trim();
   const chatId = $('#tg-chat-id').value.trim();
   if (!chatId) { errorEl.textContent = 'Chat ID wajib diisi.'; return; }
-  saveTelegram();
+  const cfg = saveTelegram();
   closeTelegramModal();
+  if (cfg.syncCode && cfg.chatId) setTimeout(syncPull, 100);
   // Kirim test
   $('#btn-test-telegram').textContent = 'Mengirim…';
   $('#btn-test-telegram').disabled = true;
