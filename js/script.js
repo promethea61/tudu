@@ -447,6 +447,7 @@ $('#form-tugas').addEventListener('submit', (e) => {
   renderBeranda();
   if (state.currentView === 'pertemuan') renderPertemuan();
   if (state.currentView === 'kalender') renderKalender();
+  if (affected) syncPush(affected, isEdit ? 'update' : 'add');
 });
 
 // Dropdown berantai: kategori -> matkul -> pertemuan
