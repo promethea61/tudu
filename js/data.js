@@ -73,34 +73,12 @@ function createDefaultData() {
     }
   }
 
-  const per = (nama, minggu) => {
-    const mk = matkul.find(m => m.nama === nama);
-    return pertemuan.find(p => p.matkulId === mk.id && p.minggu === minggu);
-  };
-
-  const tugas = [
-    {
-      id: uid(), pertemuanId: per('Matematika 1', 2).id,
-      judul: 'Latihan soal limit', deadline: per('Matematika 1', 2).tanggal + 'T09:40',
-      keterangan: 'Bab 2 no. 1-15', selesai: false, kategori: 'kuliah'
-    },
-    {
-      id: uid(), pertemuanId: per('Logika Digital 1', 2).id,
-      judul: 'Laporan praktikum gerbang logika', deadline: per('Logika Digital 1', 2).tanggal + 'T13:00',
-      keterangan: 'Format PDF, kumpul di Classroom', selesai: false, kategori: 'kuliah'
-    },
-    {
-      id: uid(), pertemuanId: null,
-      judul: 'Beli buku tulis', deadline: isoDate(start),
-      keterangan: '', selesai: false, kategori: 'personal'
-    }
-  ];
-
+  // Tidak ada tugas contoh: data kosong saat pertama dibuka.
   return {
     semesterStart: isoDate(start),
     matkul,
     pertemuan,
-    tugas,
+    tugas: [],
     currentView: 'beranda',
     searchTerm: '',
     filter: 'all',

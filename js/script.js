@@ -781,10 +781,17 @@ async function syncApi(action, payload = {}) {
 
 function normDeadline(v) {
   if (!v) return '';
-  if (v.length === 10) return v;
-  // "2026-12-01T09:40:00+00:00" -> "2026-12-01T09:40"
-  const m = String(v).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
-  return m ? `${m[1]}T${m[2]}` : String(v).slice(0, 16);
+  const s = String(v).trim().replace(' ', 'T');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  if (!m) return '';
+  // Tanggal saja dari DB: T00:00:00+00 (jangan di-shift ke jam 07:00)
+  if (/T00:00:00(?:\.\d+)?(?:Z|[+-]\d{2}(?::?\d{2})?)?$/.test(s)) return m[1];
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return `${m[1]}T${m[2]}`;
+  const w = new Date(d.getTime() + 7 * 3600_000); // UTC -> WIB
+  const iso = w.toISOString();
+  return `${iso.slice(0, 10)}T${iso.slice(11, 16)}`;
 }
 
 function taskToRemote(t) {
